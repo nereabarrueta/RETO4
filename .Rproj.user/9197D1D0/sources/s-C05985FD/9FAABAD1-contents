@@ -1,0 +1,287 @@
+#MODELOS (KNN, NAIVE BAYES Y REGRESION LINEAL MULTIPLE)
+#POSIBLES SUSTITUTOS Y MEJOR JUGADA
+#carga de librarys
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(naniar)
+
+paramodelos<-read_excel("Datos Transformados/paramodelos.xlsx")
+paramodelos<-paramodelos[,-1]
+jugadores_cercanos<-read_excel("Datos Transformados/jugadores_cercanos.xlsx")
+jugadores_cercanos<-jugadores_cercanos[,-1]
+
+
+
+# KNN ---------------------------------------------------------------------
+#Data partition
+library(caret)
+set.seed(23)
+part <- createDataPartition(paramodelos$`Wings Off Ball`, p=0.8, list=FALSE)
+train <- paramodelos[ part,]
+test <- paramodelos[-part,]
+
+#quitar variable clase
+train1<-train[,-18]
+test1<-test[,-18]
+
+#meter columna clase en variable labels
+train_labels <- train$`Wings Off Ball`
+length(train_labels)
+train_labels<-as.factor(train_labels)
+class(train_labels) #factor
+
+#meter columna clase en variable labels
+test_labels <- test$`Wings Off Ball`
+length(test_labels)
+test_labels<-as.factor(test_labels)
+class(test_labels) #factor
+
+
+#modelo knn
+library(class)
+test_pred <- knn(train = train1[,-c(1,2,3,4)], 
+                       test = test1[,-c(1,2,3,4)], 
+                       cl= train_labels,#columna clase solamente
+                       k = 5,prob=T)
+test_pred
+library(caret)
+confusionMatrix(test_pred,test_labels)
+levels(test_pred)
+
+#modelo knn con jugadores cercanos
+library(caret)
+
+paramodelos_labels <- paramodelos$`Wings Off Ball`
+length(paramodelos_labels)
+paramodelos_labels<-as.factor(paramodelos_labels)
+class(paramodelos_labels) #factor
+
+predcercanos1 <-knn(train = paramodelos[,-c(1,2,3,4)], 
+                    test = jugadores_cercanos[,-c(1,2,3,4)], 
+                    cl= paramodelos_labels,#columna clase solamente
+                    k = 5,prob=T)
+
+
+predcercanos1
+
+predicciones1.1<-as.data.frame(predcercanos1)
+prediccionesWOB.1 <- cbind(jugadores_cercanos,predicciones1.1)
+
+# NAIVE BAYES -------------------------------------------------------------
+library(e1071)
+str(train)
+train$`Wings Off Ball`<-as.factor(train$`Wings Off Ball`)
+
+modelo <- naiveBayes(`Wings Off Ball`~., data=train[,-c(1,2,3,4)])
+print(modelo)
+
+
+predicciones <- predict(modelo, test1[,-c(1,2,3,4)])
+predicciones
+levels(predicciones)
+
+#modelo naive bayes con jugadores cercanos
+library(caret)
+predcercanos2 <- predict(modelo, jugadores_cercanos[,-c(1,2,3,4,18)])
+predcercanos2
+
+#comparar los valores reales y los predichos con naive bayes
+predicciones2.2<-as.data.frame(predcercanos2)
+prediccionesWOB.2 <- cbind(jugadores_cercanos,predicciones2.2)
+
+# Elegir jugadores cercanos -----------------------------------------------
+#filtrar los que nos han dado 1 en knn y naive bayes y los juntamos
+library(dplyr)
+WOFFBALL1.1<-prediccionesWOB.1%>%
+  filter(predcercanos1 == 1)
+
+WOFFBALL1.2<-prediccionesWOB.2%>%
+  filter(predcercanos2 == 1)
+
+names(prediccionesWOB.2)[19]="predcercanos1" #para que la columna de ambas tenga el mismo nombre
+names(WOFFBALL1.2)[19]="predcercanos1"
+
+WOBequal1<-rbind(WOFFBALL1.1,WOFFBALL1.2)
+
+dim(WOBequal1)
+str(WOBequal1)
+
+#analisis individual
+
+#Rokas Giedratitis alero 28 años
+#Vlatko Cancar alero 23 años (1,5)
+#Jordan Barnett alero 25 años (2,6)
+#Deividas Gailius alero 32 años (3)
+#Jaron Johnson escolta 28 años (4)
+#Pierre-Antoine Gillet ala-pivot 29 años (7)
+#Luigi Datome alero 33 años (8)
+
+#quitamos los jugadores repetidos y los mayores de 30 años
+posibles_sustitutos<-WOBequal1[-c(3,5,6,8),]
+
+library(xlsx)
+getwd()
+#write.xlsx(posibles_sustitutos,"Datos Transformados/posibles_sustitutos.xlsx")
+# MEJOR JUGADA DE NUESTRO JUGADOR -----------------------------------------
+dfjugadores_bueno<-read_excel("Datos Transformados/dfjugadores_bueno.xlsx")
+dfjugadores_bueno<-dfjugadores_bueno[,-1]
+
+jamarillo_bueno<-read_excel("Datos Transformados/jamarillo_bueno.xlsx")
+jamarillo_bueno<-jamarillo_bueno[,-1]
+
+
+#Dataframes con las variables clave (mismo numero de columnas)
+dim(jamarillo_bueno)
+dim(dfjugadores_bueno)
+
+#jamarillo_bueno elegir mejor jugada
+q90_jugadores<-apply(dfjugadores_bueno[,-c(1,2,3,4)],2,quantile, probs=0.9)
+q95_jugadores<-apply(dfjugadores_bueno[,-c(1,2,3,4)],2,quantile,probs=0.95)
+q97_jugadores<-apply(dfjugadores_bueno[,-c(1,2,3,4)],2,quantile,probs=0.97)
+q99_jugadores<-apply(dfjugadores_bueno[,-c(1,2,3,4)],2,quantile,probs=0.99)
+
+#crear tabla con percentiles para luego comparar
+resumen<-rbind(q90_jugadores, q95_jugadores, q97_jugadores, q99_jugadores)
+resumen<-as.data.frame(resumen)
+
+#Crear data frame con nombres variables y una fila para comparar (ignorar los valores)
+comparacion<-resumen[-c(2,3,4),]
+rownames(comparacion)<-"Comparacion"
+
+#Comparar jugador amarillo y jugadores para elegir mejor variable
+amarillo<-jamarillo_bueno[,-c(1,2,3,4)]
+
+for(i in 1:nrow(amarillo)){
+  for(j in 1:ncol(amarillo)){
+    
+    
+    if(amarillo[i,j] > resumen[4,j])
+    {comparacion[i,j] = 1}
+    
+    else if (amarillo[i,j] <= resumen[4,j])
+      
+    {comparacion[i,j] = 0}
+  }
+}
+
+
+#Seleccionar variable clave mejor jugada
+comparacion <- t(comparacion)
+comparacion <- as.data.frame(comparacion)
+mejor_jugada<-comparacion%>%
+  filter(Comparacion=="1")
+
+# # REGRESION LINEAL MULTIPLE ---------------------------------------------
+
+#LA MEJOR JUGADA ES SCREENS OFF
+
+#Conseguir variables con porcentajes
+#Cargar excels con todas las variables 
+jamarillo_todo<-read_excel("Datos Transformados/jugador amarillo bueno.xlsx")
+jamarillo_todo<-jamarillo_todo[1,-1]
+
+dfjugadores_todo<-read_excel("Datos Transformados/dfjugadores.xlsx")
+dfjugadores_todo<-dfjugadores_todo[,-1] 
+
+#Dejar solo las variables con % de dfjugadores
+porcentaje<-grep("%", colnames(dfjugadores_todo), value = FALSE)
+
+variables_porcentaje<-dfjugadores_todo[,porcentaje]
+
+
+
+#ANALIZAR JUGADAS DE JAMARILLO
+modelo_regresion <- glm (`Screens off %`~., data = variables_porcentaje)
+summary(modelo_regresion)
+modelo_regresion$fitted.values
+modelo_regresion$residuals
+modelo_regresion$coefficients
+summary(modelo_regresion)$r.squared
+plot(modelo_regresion$residuals)
+
+
+
+#Reglas de asociación con porcentaje de acientos entre intentos
+
+efectividadminutosin <-jugadores_cercanos<-read_excel("Datos Transformados/dfjugadores.xlsx")
+
+
+
+
+efectividadminuto1<-efectividadminutosin[,-c(1:6)]
+#Dejar solo las variables con % de dfjugadores
+porcentaje<-grep("%", colnames(efectividadminutosin), value = FALSE)
+
+variables_porcentaje<-efectividadminutosin[,porcentaje]
+#discretizar
+for(i in 1:ncol(variables_porcentaje)){
+  x<-as.vector(unlist(variables_porcentaje[,i]))
+  variables_porcentaje[,i]<-ifelse(x<=quantile(x,0.55),0,1)
+}
+
+write.csv(variables_porcentaje,"asociacion_reto.csv")
+
+
+#Reglas de asociación con intentos
+
+efectividadminuto1<-efectividadminutosin[,-c(1:4)]
+#Dejar solo las variables con % de dfjugadores
+#porcentaje<-grep("%", colnames(efectividadminutosin), value = FALSE)
+
+variables_porintentos<-efectividadminuto1[,c(6,9,11,13,16,17,18,19,20,21,23,25,27,29,31,33,35,37,39,41,45)]
+
+
+#discretizar
+for(i in 1:ncol(variables_porintentos)){
+  x<-as.vector(unlist(variables_porintentos[,i]))
+  variables_porintentos[,i]<-ifelse(x<=quantile(x,0.75),0,1)
+}
+
+write.csv(variables_porintentos,"asociacion_reto1.csv")
+
+
+
+
+#Porque no conseguimos resultados contundentes con nuestra jugada
+hist(efectividadminutosin$`Screens off %`)
+
+#tanto usando porcentajes como intentos no conseguimos una buna regla de asociacion con nuestra
+#variable Screens Off de y el porque se debea a que pocos jugadores destacan en esta jugada
+
+# Inferencia --------------------------------------------------------------
+
+todo<-read_excel("Datos Transformados/dfjugadores.xlsx")
+todo<-todo[,-1]
+
+ACB<-todo%>%
+  group_by(League)%>%
+  filter(League=="Spanish ACB")
+
+Baskonia<-ACB[ACB$Team=="Baskonia", ] 
+Equipos<-anti_join(ACB, Baskonia)
+
+t.test(Baskonia$Assists,Equipos$Assists,
+       alternative = c("greater"),
+       mu = 0, paired = FALSE, var.equal = T,
+       conf.level = 0.95)
+
+#El p valor es mayor que 0.05 (0.09636), por tanto no rechazamos eso
+#(si el p valor sale menor que 0.05 entonces rechazas eso)
+
+#histograma
+vector<-c()
+for(i in 1:1000){
+  media<-mean(sample(Equipos$Assists,length(Equipos$Assists),replace=T))
+  vector<-cbind(vector,media)
+}
+
+vectordf<-t(vector)
+vectordf<-as.data.frame(vectordf)
+
+ggplot(vectordf)+
+  geom_histogram(aes(x=V1))+
+  labs(x="Asistencias") +
+  geom_vline(xintercept=0.09636, color="red")
+

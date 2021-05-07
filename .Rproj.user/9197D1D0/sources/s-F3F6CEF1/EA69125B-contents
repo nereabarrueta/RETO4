@@ -1,0 +1,254 @@
+
+# Librerias ---------------------------------------------------------------
+source("Scripts/librerias.R")
+
+# Carga de datos ----------------------------------------------------------
+
+food<-read.csv("DatosOriginales/food.csv", header = TRUE, sep = ";")
+
+furniture1<-read.csv("DatosOriginales/furniture_first.csv", header = TRUE, sep = ";")
+furniture2<-read.csv("DatosOriginales/furniture_second.csv", header = TRUE, sep = ";")
+
+furniture<-rbind(furniture1, furniture2)
+
+str(furniture)
+str(food)
+
+#source("Scripts/Limpieza_texto_food.R")
+#source("Scripts/Limpieza_texto_furniture.R")
+
+str(furniture)
+str(food)
+
+# FOOD --------------------------------------------------------------------
+
+# Tipo de datos -----------------------------------------------------------
+str(food)
+food$store<-as.factor(food$store)
+food$till_id<-as.factor(food$till_id)
+food$sales<-as.numeric(food$sales)
+food$qty<-as.numeric(food$qty)
+
+food$product_category_1_name<-as.factor(food$product_category_1_name)
+food$product_category_2_name<-as.factor(food$product_category_2_name)
+food$product_category_3_name<-as.factor(food$product_category_3_name)
+
+levels(food$product_category_1_name)
+levels(food$product_category_2_name)
+levels(food$product_category_3_name)
+
+food$transaction_day <- substr(food$transaction_timestamp, 1, 10)
+food$transaction_hour <- substr(food$transaction_timestamp, 12,16)
+
+food$transaction_day<-as.Date(food$transaction_day)
+str(food)
+
+#eliminar columna timestamp
+food<-select(food, - transaction_timestamp)
+
+# Missings ----------------------------------------------------------------
+any_na(food)
+
+miss_var_summary(food)
+
+food_Norte<-filter(food, store == "Norte")
+vis_miss(food_Norte, warn_large_data = FALSE)
+
+food_Sur<-filter(food, store == "Sur")
+vis_miss(food_Sur, warn_large_data = FALSE)
+
+#buscamos valores vacios en la columna membership_id
+food_sin_member<-filter(food, membership_id == "") #128472 miembros de IKEA
+
+food_con_member<-filter(food, membership_id != "") #dataset sin blancos en membership
+str(food_con_member)
+
+#eliminar instancias con item description unknown
+unknown<-filter(food_con_member, item_description == "UNKNOWN") #2193 instancias 
+summary(unknown)
+
+food_con_member<-food_con_member[-unknown,]
+
+# Outliers (food) ----------------------------------------------------------------
+
+#QUANTITY
+range(food_con_member$qty)
+
+summary(food_con_member$qty)
+which.max(food_con_member$qty) #73227
+
+food_min_qty<-filter(food_con_member, qty <= 0.999)
+#son kilos, y al ser al peso los valores son muy bajos
+
+food_max_qty<-filter(food_con_member, qty == 33.000) #cafes
+
+food_sin_out_qty<-filter(food_con_member, qty != 33) 
+summary(food_sin_out_qty$qty)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.001   1.000   1.000   1.435   2.000  20.000
+
+str(food_con_member)
+str(food_sin_out)
+
+#boxplot cantidad comprada
+boxplot_qty<-ggplot(food_con_member, aes(x="qty", y= qty)) +
+  geom_boxplot(color = "black", fill = "red") +
+  scale_y_continuous(breaks = seq(0,35,5), limits = c(0, 35)) +
+  labs(x= "Cantidad",
+       y = "Cantidad")
+
+boxplot_qty 
+
+
+boxplot_sin_out_qty<-ggplot(food_sin_out_qty, aes(x="qty", y= qty)) +
+  geom_boxplot(color = "black", fill = "red") +
+  scale_y_continuous(breaks = seq(0,22,5), limits = c(0, 22)) +
+  labs(x= "Cantidad",
+       y = "Cantidad")
+
+boxplot_sin_out_qty #boxplot sin valor mayor de cantidad
+
+food_qty_20<-filter(food_con_member, qty == 20)#pork y onion
+#pork es del restaurante: comida grande
+#onion es del supermercado: cebolla frita (es en gramos (500g))
+
+#SALES
+summary(food_con_member$sales)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.010   1.000   1.600   2.668   3.000 120.000 
+
+which.max(food_con_member$sales) #120 euros en pork (comida grande)
+#food_qty_20<-food_sales_max
+
+food_sales_sin_max<-filter(food_con_member, sales != 120)
+summary(food_sales_sin_max$sales)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.010   1.000   1.600   2.666   3.000 110.000
+
+which.max(food_sales_sin_max$sales) #110 euros en fried onion
+
+food_sales_min<-filter(food_con_member, sales <=0.01) #1 gramo de chuches
+str(food_con_member)
+
+food_min_sales2<-filter(food_con_member, sales <= 0.1)
+
+#boxplot sales
+boxplot_sales<-ggplot(food_con_member, aes("sales", sales)) +
+  geom_boxplot(color = "black", fill = "red") +
+  scale_y_continuous(breaks = seq(0, 125, 25), limits = c(0, 125))
+
+boxplot_sales
+#boxplot sin outliers
+food_sales_sin_out<-filter(food_con_member, sales != 120, sales >= 0.1) 
+#sin los valores mas altos (pork) ni los mas bajos
+
+range(food_sales_sin_out$sales)
+
+boxplot_sin_out_sales<-ggplot(food_sales_sin_out, aes("sales", sales)) +
+  geom_boxplot(color = "black", fill = "red") +
+  scale_y_continuous(breaks = seq(0, 120, 15), limits = c(0, 120))
+
+boxplot_sin_out_sales
+
+
+# FURNITURE ---------------------------------------------------------------
+
+
+# Tipo de datos -----------------------------------------------------------
+str(furniture)
+any_na(furniture)
+furniture$store<-as.factor(furniture$store)
+furniture$qty<-as.numeric(furniture$qty)
+furniture$sales<-as.numeric(furniture$sales)
+
+furniture$product_category_1_name<-as.factor(furniture$product_category_1_name)
+furniture$product_category_2_name<-as.factor(furniture$product_category_2_name)
+furniture$product_category_3_name<-as.factor(furniture$product_category_3_name)
+
+levels(furniture$product_category_1_name)
+levels(furniture$product_category_2_name)
+levels(furniture$product_category_3_name)
+
+furniture$transaction_day <- substr(furniture$transaction_timestamp, 1, 10)
+furniture$transaction_hour <- substr(furniture$transaction_timestamp, 12,16)
+
+furniture$transaction_day<-as.Date(furniture$transaction_day)
+str(furniture)
+
+#eliminar columna timestamp
+furniture<-select(furniture, - transaction_timestamp)
+str(furniture)
+
+
+# Missings (furniture)---------------------------------------------------------------
+
+any_na(furniture)
+
+miss_var_summary(furniture)
+
+furniture_Sur<-filter(furniture, store == "Sur")
+furniture_Norte<-filter(furniture, store == "Norte")
+
+vis_miss(furniture_Sur, warn_large_data = FALSE)
+miss_var_summary(furniture_Sur)
+
+
+vis_miss(furniture_Norte, warn_large_data = FALSE )
+miss_var_summary(furniture_Norte)
+
+
+# Outliers (furniture) ----------------------------------------------------------------
+range(furniture$qty)
+
+summary(furniture$qty)
+which.max(furniture$qty)
+#hay tanto valores muy altos, llegando casi a 500, como compras de un solo producto o muy pocos
+
+furniture[45761,] #outliers? pueden ser empresas muy grandes? hay muchos
+#no podria ser un fallo de decimal ya que tienen que ser numeros enteros
+
+which.min(furniture$qty)
+
+#instancias con valores altos en qty
+prueba<-filter(furniture, qty >= 100.00)
+
+#intento detectar cuantas filas tienen decimales en qty
+furniture$qty<-gsub(".00", "", furniture$qty)
+decimales<-furniture %>%
+  filter(qty == grep("[[:punct:]][[:digit:]][[:digit:]]", qty, value = TRUE))
+
+#boxplot cantidad comprada
+boxplot_qty<-ggplot(furniture, aes(x="qty", y= qty)) +
+  geom_boxplot(color = "black", fill = "red") +
+  scale_y_continuous(breaks = seq(0,500,50), limits = c(0, 500)) +
+  labs(x= "Cantidad",
+       y = "Cantidad")
+
+boxplot_qty 
+
+furniture400<-filter(furniture, qty > 400) #hay mas de 9000 supuestos outliers, tienen que ser empresas
+#del sector hosteleria o algo parecido
+summary(furniture400)
+
+duplicados<-furniture400[duplicated(furniture400[,c(1,3)]),] #hay 1786 membership que se repiten
+#tienen que ser empresas que compran varias cosas en grandes cantidades
+
+
+#SALES
+summary(furniture$sales)
+#Min. 1st Qu.  Median    Mean   3rd Qu.    Max. 
+#1     667      1578     1453    2228      3277 
+
+which.max(furniture$sales)
+
+
+food_sales_sin_max<-filter(food_con_member, sales != 120)
+summary(food_sales_sin_max$sales)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.010   1.000   1.600   2.666   3.000 110.000
+
+which.max(food_sales_sin_max$sales) #110 euros en fried onion
+
+food_sales_min<-filter(food_con_member, sales <=0.01) #1 gramo de chuches
+str(food_con_member)
+

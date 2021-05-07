@@ -1,0 +1,296 @@
+#SISTEMA DE RECOMENDACION BROMI 3004
+library(readxl)
+setwd("C:/Users/Usuario/Desktop/Data Mining/Reto4")
+
+
+if (!require(recommenderlab)){   
+  install.packages("recommenderlab") 
+} 
+
+#################################################################################################
+### SISTEMAS DE RECOMENDACI???N
+
+library(readxl)
+broma <- read_excel("bromi.xls")
+View(broma)
+str(broma)
+
+library(tibble)
+broma <- data.frame(column_to_rownames(broma, var = "...1"))
+
+dim(broma)
+# 24.938 usuarios.
+# [,1] recuento del numero de bromas que un usuario ha evaluado.
+# [,2:100] calificaciones de las 100 bromas que componen el conjunto de datos.
+# Las calificaciones estan en un rango de [-10, 10], siendo -10 la calificacion mas baja y 10 la mas alta.
+# los elementos no clasificados por los usuarios han sido asignados con un valor de 99
+
+#################################################################################################
+##### PREPROCESADO
+
+# Vamos a coger 1.000 filas para que el dataset no consuma demasiados recursos.
+set.seed(666)
+bromita <- broma[sample(nrow(broma),1000), ] # seleccionamos 10000 filas al azar
+dim(bromita)
+summary(bromita$N_puntuaciones)
+# Se han evaluado un promedio de 24.95 bromas
+# Hay usuarios que s???lo han evaluado 15 y otros usuarios 35
+
+bromita <- bromita[,-1] # eliminamos la primera columna, porque no son puntuaciones
+bromita[bromita == 99] <- NA # indicamos que todos esos 99 en realidad son missing
+
+# bromita[,colSums(is.na(bromita)) < nrow(bromita) * 0.5] # mantenme las columnas que tengan al menos un 50% de registros
+
+#################################################################################################
+##### ESTAD???STICOS DESCRIPTIVOS
+
+minimo <- function(x) min(x, na.rm=T)
+minimo(bromita)
+
+maximo <- function(x) max(x, na.rm=T)
+maximo(bromita)
+
+summary(unlist(bromita)) # descriptivos de todo el dataframe
+
+media_evaluacion <- rowMeans(bromita, na.rm = TRUE)
+hist(media_evaluacion, main = "Promedio evaluaciones por usuario", col = "darkorchid1", xlim=c(-10,10))
+
+#################################################################################################
+##### CONVERSI???N A MATRIZ DE PUNTUACIONES
+
+library(recommenderlab)
+matriz_rec <- as.matrix(bromita)
+matriz_rec <- as(matriz_rec,"realRatingMatrix")
+matriz_rec
+as(matriz_rec, "matrix")
+
+# Cuando hay NAs, la matriz puede ser facilmente convertida en un objeto realRatingMatrix 
+# que almacena los datos en formato disperso (solo los valores no NA se almacenan explicitamente
+# los valores NA se representan por un punto)
+getRatingMatrix(matriz_rec)
+
+# Tambien ofrece una lista de usuarios con sus calificaciones para una inspeccion mas detallada
+as(matriz_rec, "list")
+
+# Opcion normalizar/desnormalizar antes de entrar a modelo
+matriz_norm <- normalize(matriz_rec)
+getRatingMatrix(matriz_norm)
+denormalize(matriz_norm)
+
+# Por ultimo, podemos binarizar nuestra matriz a partir de una puntuacion umbral (gusta/no gusta)
+matriz_bin <- binarize(matriz_rec, minRating=0)
+matriz_bin
+as(matriz_bin, "matrix")
+
+# Cuantos tipos de recomendadores hay? Todos estos. Iremos probando algunos
+recommenderRegistry$get_entries(dataType = "realRatingMatrix")
+
+#$POPULAR_realRatingMatrix --> item popularity  
+#$RE-RECOMMENDER_realRatingMatrix --> Re-recomienda productos
+#$UBCF_realRatingMatrix --> user-based collaborative filtering
+#$IBCF_realRatingMatrix --> item-based collaborative filtering
+#$SVDF_realRatingMatrix --> Singular Value Decomposition con Gradient Descent
+
+#################################################################################################
+##### ITEM POPULARITY (recomienda los productos mas vendidos)
+
+recomendador_top <- recommenderlab::Recommender(matriz_rec[c(1:500),], 
+                                                method = "POPULAR")
+names(getModel(recomendador_top)) # opciones derivadas del recomendador "popular"
+as(getModel(recomendador_top)$topN, "matrix") # la lista puede albergar 100 recomendaciones para 1 usuario
+
+# Pedimos que nos ofrezca 5 articulos para 2 usuarios nuevos (del dataset original que hemos dejado reservado)
+recomienda5 <- predict(recomendador_top, matriz_rec[c(501:502),], n=5)
+recomienda5
+
+# El resultado contiene dos listas de recomendaciones ordenadas de la parte superior de la lista N, una para cada usuario. 
+# Los articulos recomendados pueden ser inspeccionados como una lista.
+as(recomienda5, "list")
+
+# Ya que las listas estan ordenadas, podemos extraer sublistas de los mejores articulos
+# Por ejemplo, podemos obtener las 3 mejores recomendaciones para cada lista usando bestN().
+recomienda3 <- bestN(recomienda5, n = 3)
+recomienda3
+as(recomienda3, "list")
+
+# Adem???s, se pueden predecir puntuaciones que dos futuros clientes les dar???an a esos art???culos
+recomienda_rating <- predict(recomendador_top, 
+                             matriz_rec[c(501:502),], 
+                             type="ratings")
+recomienda_rating
+as(recomienda_rating, "matrix")[,1:10] # pedimos que nos ejemplifique los 10 primeros productos
+
+# Tambi???n podemos solicitar la matriz de clasificaci???n completa que incluye las clasificaciones 
+# originales del usuario y las nuevas predicciones.
+recomienda_rating_orig <- predict(recomendador_top, 
+                                  matriz_rec[c(501:502),], 
+                                  type="ratingMatrix")
+recomienda_rating_orig
+as(recomienda_rating_orig, "matrix")[,1:10]
+
+################################################################################################
+##### RE-RECOMENDADOR
+
+set.seed(666)
+particion <- evaluationScheme(matriz_rec, method="split", train=0.8, given=15, goodRating=0)
+re_recomendador <- recommenderlab::Recommender(getData(particion, "train"),
+                                               method = "RERECOMMEND")
+
+re_recomienda <- predict(re_recomendador, 
+                         getData(particion, "known"), 
+                         n=5)
+re_recomienda
+as(re_recomienda, "list")
+as(re_recomienda, "list")[1]
+
+re_recomienda_rating <- predict(re_recomendador, 
+                                getData(particion, "known"), 
+                                type="ratings")
+re_recomienda_rating
+as(re_recomienda_rating, "matrix")[1:5,1:20]
+broma[12926,]
+
+#################################################################################################
+##### FILTRADO COLABORATIVO USER-BASED
+
+set.seed(666)
+particion <- evaluationScheme(matriz_rec, method="split", train=0.8, given=15, goodRating=5)
+particion  
+# Usaremos el m???todo split
+# Con una proporci???n del 80% para el train set
+# Tendremos en cuenta 15 items para nuestra predicci???n
+# Establecemos que >0 es el umbral para determinar que algo gusta
+
+# evaluationScheme() crea 3 conjuntos de datos. 
+# Divide los datos en train y conjunto de pruebas, pero dentro del conjunto 
+# de pruebas crea adem???s un conjunto de datos conocidos y otro desconocido, 
+# que se usar???n para validar las predicciones hechas usando los datos conocidos.
+
+##### FILTRADO COLABORATIVO
+
+# Sin normalizar, coseno como ???ndice de similitud
+User_based_no_norm <- Recommender(getData(particion, "train"), 
+                                  "UBCF", 
+                                  param=list(normalize = "center", method="pearson"))
+
+names(getModel(User_based_no_norm))
+getModel(User_based_no_norm)$nn # n???mero de usuarios que evalua (se puede cambiar en param, nn=x)
+
+# Con escalado, coseno como ???ndice de similitud
+User_based_norm <- Recommender(getData(particion, "train"),
+                               "UBCF",
+                               param=list(normalize = "Z-score", method="Cosine")) #"pearson"/"Euclidean"
+
+# Predecimos con los dos modelos
+predicciones1 <- predict(User_based_no_norm, getData(particion, "known"), type="ratings")
+predicciones1
+as(predicciones1, "matrix")[,1:10]
+
+predicciones2 <- predict(User_based_norm, getData(particion, "known"), type="ratings")
+predicciones2
+as(predicciones2, "matrix")[,1:10]
+
+error1 <- rbind(
+  UB = calcPredictionAccuracy(predicciones1, getData(particion, "unknown")),
+  UB_Norm = calcPredictionAccuracy(predicciones2, getData(particion, "unknown"))
+)
+error1
+
+test_error <- calcPredictionAccuracy(predicciones1, getData(particion, "unknown"), byUser = TRUE)
+test_error
+
+#################################################################################################
+##### FILTRADO COLABORATIVO ITEM-BASED
+
+Item_based_no_norm <- Recommender(getData(particion, "train"), 
+                                  "IBCF",
+                                  param=list(normalize = NULL, method="Cosine"))
+
+Item_based_norm <- Recommender(getData(particion, "train"), 
+                               "IBCF",
+                               param=list(normalize = "Z-score", method="Cosine"))
+
+names(getModel(Item_based_norm))
+getModel(Item_based_norm)$k # n???mero de items que evalua (se puede cambiar en param, k=x)
+
+predicciones4A <- predict(Item_based_norm, getData(particion, "known"), type="ratingMatrix") 
+predicciones4A
+as(predicciones4A, "matrix")[,1:10]
+
+predicciones4B <- predict(Item_based_norm, getData(particion, "known"), type="ratingMatrix") 
+predicciones4B
+as(predicciones4A, "matrix")[,1:10]
+
+error2 <- rbind(
+  IB = calcPredictionAccuracy(predicciones4A, getData(particion, "unknown")),
+  IB_Norm = calcPredictionAccuracy(predicciones4B, getData(particion, "unknown"))
+)
+error2
+
+# Miramos a ver con qu??? modelo cometemos menos error
+library(dplyr)
+library(ggplot2)
+rbind(error1,error2) %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "method") %>% 
+  ggplot(aes(x = method, y = MAE)) +
+  geom_col() +
+  theme_minimal()
+
+#################################################################################################
+##### HYBRID RECOMMENDER (POPULAR, USER-BASED & ITEM-BASED)
+
+Hybrid_recom <- HybridRecommender(Recommender(getData(particion, "train"), "POPULAR"),
+                                  Recommender(getData(particion, "train"),"UBCF", param=list(normalize = "Z-score",method="Cosine")),
+                                  Recommender(getData(particion, "train"),"IBCF", param=list(normalize = "Z-score",method="Cosine")),
+                                  weights = c(.6, .2, .2))
+
+predicciones5 <- predict(Hybrid_recom, getData(particion, "known"), n=5)
+predicciones5
+as(predicciones5, "list")
+
+HB_Nor <- calcPredictionAccuracy(predicciones5, getData(particion, "unknown"), goodRating=0, given=15)
+HB_Nor
+
+#################################################################################################
+##### COMPARACI???N DE RECOMENDADORES I
+
+recomendacion_top2 <- evaluationScheme(matriz_rec, method="cross", k=10, given=5, goodRating=5)
+recomendacion_top2
+
+# Evaluamos las listas de recomendaci???n top-1, top-3 y top-5
+resultados <- evaluate(recomendacion_top2, 
+                       method="POPULAR", 
+                       type = "topNList", # se puede sustituir por ratings quitando el siguiente argumento
+                       n=c(1,3,5))
+resultados
+getConfusionMatrix(resultados)[[1]] # 1er k-fold
+avg(resultados) # promedio de los 10k-folds
+plot(resultados, annotate=TRUE) # Curva ROC por defecto
+
+##### COMPARACI???N DE RECOMENDADORES II
+
+recomendacion_top3 <- evaluationScheme(matriz_rec, method="cross", k=5, given=5, goodRating=5)
+recomendacion_top3
+
+algoritmos_variados <- list(
+  "aleatorios" = list(name="RANDOM", param=NULL),
+  "populares" = list(name="POPULAR", param=NULL),
+  "user-based" = list(name="UBCF", param=list(normalize = "Z-score",method="Cosine",nn = 50)),
+  "item-based" = list(name="IBCF", param=list(normalize = "Z-score",method="Cosine",k = 50)),
+  "SVD-GD" = list(name="SVD", param=list(normalize = "Z-score",k = 5)))
+
+recomendacion_variada <- evaluate(recomendacion_top3,
+                                  algoritmos_variados, 
+                                  type = "topNList", 
+                                  n=c(1, 3, 5, 10, 15, 20))
+recomendacion_variada
+
+names(recomendacion_variada)
+recomendacion_variada[["user-based"]]
+recomendacion_variada[[3]]
+plot(recomendacion_variada, annotate=c(1:20), legend="center")
+plot(recomendacion_variada, annotate=c(1:20), legend="bottom")
+
+predicciones6 <- evaluate(recomendacion_top3, algoritmos_variados, type = "ratings")
+avg(predicciones6)
