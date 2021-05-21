@@ -156,54 +156,9 @@ plot(x= food$qty, y=food$sales , main= "Relacion entre cantidad y ventas en comi
 #Se puede ver un claro OUTLIER '!?!?!?!
 
 
-# Tarta por categor?a del archivo food ------------------------------------
+# Tarta por categoria del archivo food ------------------------------------
+
 #Preparando datos:
-#Conteo de variables no numericas ----------------------------------------
-dfconteo_c1<-food%>%
-  dplyr::count(product_category_1_name)
-dfconteo_c2<-food%>%
-  dplyr::count(product_category_2_name) 
-dfconteo_c3<-food%>%
-  dplyr::count(product_category_3_name)
-
-dfconteo_store<-food%>%
-  dplyr::count(store)
-
-#########
-variables<-c("product_category_1_name", "product_category_2_name", "product_category_3_name")
-
-for (i in variables){
-  conteo<-food%>%
-    dplyr::count(variables[i])
-}
-
-conteo<-data.frame()
-a<-function(df, variables){
-  for (i in variables){
-    data<-df%>%
-      dplyr::count(variables[[i]])
-  conteo<-rbind(conteo,data)
-    
-  }
-}
-a(food,variables)
-
-for (i in variables){
-  df[[i]] <- count(food[[i]])
-}
-
-df<-data.frame()
-for(i in variables){
-  conteo<-dplyr::count(food,variables[i])
-  df<-cbind(df,conteo)}
-  
-  for(i in 1:ncol(variables_porcentaje)){
-    x<-as.vector(unlist(variables_porcentaje[,i]))
-    variables_porcentaje[,i]<-ifelse(x<=quantile(x,0.55),0,1)
-  }
-###########
-
-
 
 # conteo de variables no numericas ----------------------------------------
 dfconteo_c1<-food%>%
@@ -216,86 +171,7 @@ dfconteo_store<-food%>%
   dplyr::count(store)
 
 
-
-#proporcionalmente en tarta
-#preparacion de datos
-
-
-
-p1<-sum(dfconteo_c1$n)
-c1<-dfconteo_c1[,2]/p1
-p2<-sum(dfconteo_c2$n)
-c2.1<-dfconteo_c2[1,2]/p2
-c2.2<-dfconteo_c2[2,2]/p2
-c2.3<-dfconteo_c2[3,2]/p2
-c2.4<-dfconteo_c2[4,2]/p2
-p3<-sum(dfconteo_c3$n)
-c3.1<-dfconteo_c3[1,2]/p3
-c3.2<-dfconteo_c3[2,2]/p3
-c3.3<-dfconteo_c3[3,2]/p3
-c3.4<-dfconteo_c3[4,2]/p3
-c3.5<-dfconteo_c3[5,2]/p3
-c3.6<-dfconteo_c3[6,2]/p3
-c3.7<-dfconteo_c3[7,2]/p3
-c3.8<-dfconteo_c3[8,2]/p3
-c3.9<-dfconteo_c3[9,2]/p3
-c3.10<-dfconteo_c3[10,2]/p3
-c3.11<-dfconteo_c3[11,2]/p3
-c3.12<-dfconteo_c3[12,2]/p3
-c3.13<-dfconteo_c3[13,2]/p3
-c3.14<-dfconteo_c3[14,2]/p3
-c3.15<-dfconteo_c3[15,2]/p3
-c3.16<-dfconteo_c3[16,2]/p3
-c3.17<-dfconteo_c3[17,2]/p3
-c3.18<-dfconteo_c3[18,2]/p3
-c3.19<-dfconteo_c3[19,2]/p3
-c3.20<-dfconteo_c3[20,2]/p3
-c3.21<-dfconteo_c3[21,2]/p3
-c3.22<-dfconteo_c3[22,2]/p3
-c3.23<-dfconteo_c3[23,2]/p3
-c3.24<-dfconteo_c3[24,2]/p3
-c3.25<-dfconteo_c3[25,2]/p3
-
-#######
-dfconteo_c3<-as.list(dfconteo_c3)
-for(i in 1:25){
-  c3.i<-dfconteo_c3[i,2]/p3
-}
-
-for(i in 1:25){
-  lapply(dfconteo_c3[[i]][[2]/p3)
-}
-########
-
-
-porcentajes1<-cbind(c1)
-porcentajes1<-as.data.frame(t(porcentajes1))
-colnames(porcentajes1)<-("Porcentajes categoria 1")
-porcentajes2<-cbind(c2.1,c2.2,c2.3,c2.4)
-porcentajes2<-as.data.frame(t(porcentajes2))
-colnames(porcentajes2)<-("Porcentajes categoria 2")
-porcentajes3<-cbind(c3.1,c3.2,c3.3,c3.4,c3.5,c3.6,c3.7,c3.8,c3.9,c3.10,c3.11,c3.12,c3.13,c3.14,c3.15,c3.16,c3.17,c3.18,c3.19,c3.20,c3.21,c3.22,c3.23,c3.24,c3.25)
-porcentajes3<-as.data.frame(t(porcentajes3))
-colnames(porcentajes3)<-("Porcentajes categoria 3")
-Nombre1<-c("Food")
-Nombre2<-c("Bistro","Food Market", "Other products","Restaurant")
-vecnombres3<-as.character(dfconteo_c3$product_category_3_name)
-Nombre3<-c(vecnombres3)
-
-
-
-df_t1<-cbind(Nombre1,porcentajes1)
-names(df_t1) <- c("Nombre","porcentajes")
-
-df_t2<-cbind(Nombre2,porcentajes2)
-names(df_t2) <- c("Nombre","porcentajes")
-
-df_t3<-cbind(Nombre3,porcentajes3)
-names(df_t3) <- c("Nombre","porcentajes")
-
-
-
-t<-function(df,p,t, n){ 
+t<-function(df,t, n){ 
 ggplot(df,aes(x="",y=porcentajes, fill=Nombre))+
   geom_bar(stat = "identity", color="white")+
     geom_text(aes(label= round(porcentajes,2) ), position=position_stack(vjust=0.5),color="black",size=4)+
@@ -304,10 +180,19 @@ ggplot(df,aes(x="",y=porcentajes, fill=Nombre))+
 
 }
 
+names(dfconteo_c1) <- c("Nombre","porcentajes")
+dfconteo_c1$porcentajes <- dfconteo_c1$porcentajes/sum(dfconteo_c1$porcentajes)
 
-t(df_t2,porcentajes2, "Niveles de la segunda categoria de food", "Niveles")
-t(df_t1,porcentajes1, "Niveles de la primera categoria de food", "Niveles")
-t(df_t3,porcentajes3, "Niveles de la tercera categoria de food", "Niveles")
+names(dfconteo_c2) <- c("Nombre","porcentajes")
+dfconteo_c2$porcentajes <- dfconteo_c2$porcentajes/sum(dfconteo_c2$porcentajes)
+
+names(dfconteo_c3) <- c("Nombre","porcentajes")
+dfconteo_c3$porcentajes <- dfconteo_c3$porcentajes/sum(dfconteo_c3$porcentajes)
+
+
+t(dfconteo_c1, "Niveles de la segunda categoria de food", "Niveles")
+t(dfconteo_c2, "Niveles de la primera categoria de food", "Niveles")
+t(dfconteo_c3, "Niveles de la tercera categoria de food", "Niveles")
 
 
 
@@ -462,4 +347,74 @@ ggplot(furniture_week, aes(x=as.factor(week), y= sales, group= 1)) +
   scale_color_manual(values = c( "darkorchid1", "darkorchid4" ))+
   theme_classic()+
   theme(panel.grid.major = element_line(color="grey", linetype="dotted"))
+
+
+
+
+
+
+# Intento shiny 1 ---------------------------------------------------------
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(shiny)
+library(DT)
+library(shinyWidgets)
+library(shinythemes)
+library(leaflet)
+
+df<-furniture
+
+df<-furniture[1:1000,] #para hacer mas pequeño el dataset a ver si asi carga pero no :(
+df$transaction_day <- substr(df$transaction_timestamp, 1, 10)
+df$transaction_hour <- substr(df$transaction_timestamp, 12,16)
+
+df$transaction_day<-as.Date(df$transaction_day)
+str(df)
+
+#eliminar columna timestamp
+df<-select(df, - transaction_timestamp)
+str(df)
+
+ui <- fluidPage(
+  titlePanel("Top 10 categorías vendidas"),
+  sidebarLayout(
+    sidebarPanel(
+      dateRangeInput(inputId = 'date_range', label = 'Selecciona el periodo temporal', min=min(df$transaction_day), max=max(df$transaction_day), start="2019-06-01", end="2019-06-29"), 
+      pickerInput("tienda_select", label= "Selecciona la tienda Ikea: ", choices = as.character(unique(df$store)), selected = "Norte")
+      
+    ),
+    mainPanel(
+      tabsetPanel(
+        tabPanel('Categoria', plotlyOutput('barra'))
+      )
+    )
+  )
+)
+
+
+server<-function(input, output){
+  tabla<-reactive({
+    tabla<-filter(df, 
+                  transaction_day >= input$date_range[1] & 
+                  transaction_day <= input$date_range[2] )%>%
+                  group_by(product_category_1_name)%>%
+                  summarise(cantidad=sum(qty))
+  })
+  
+
+    output$barra <- renderPlot({
+      ggplot(top_n(tabla(),10), aes(product_category_1_name, cantidad))+
+        theme_bw()+
+        theme(axis.text.x = element_text(face= 'bold', size=12),
+              axis.text.y = element_text(face= 'bold', size=12),
+              axis.title.x = element_blank())
+
+
+})
+}
+
+
+shinyApp(ui = ui, server = server)
+
 
