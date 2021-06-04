@@ -1,4 +1,11 @@
 *.xlsx
 *.csv
 *.Rhistory
-.Rproj.user
+*.Rproj.user
+*.RData
+*.Rproj.user
+*.sql
+*.jpeg
+*.png
+
+

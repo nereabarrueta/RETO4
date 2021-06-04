@@ -1,6 +1,9 @@
 # Carga de datos y librerias----------------------------------------------------------
 source("Scripts/librerias.R")
+
+  #eliminamos la notacion cientifica  
 options(scipen=999)
+
 furniture_first <- read.csv("DatosOriginales/furniture_first.csv",sep=";")
 furniture_second <- read.csv("DatosOriginales/furniture_second.csv",sep=";")
 food <- read.csv("DatosOriginales/food.csv",sep=";")
@@ -16,21 +19,6 @@ str(furniture)
 furniture$product_category_1_name<-str_trim(furniture$product_category_1_name)
 furniture$product_category_2_name<-str_trim(furniture$product_category_2_name)
 furniture$product_category_3_name<-str_trim(furniture$product_category_3_name)
-
-
-# Limpiar texto food -------------------------------------------------
-
-#Quitar blancos innecesarios delante y detras de product category
-food$product_category_1_name<-str_trim(food$product_category_1_name)
-food$product_category_2_name<-str_trim(food$product_category_2_name)
-food$product_category_3_name<-str_trim(food$product_category_3_name)
-
-
-
-#Quitar puntuacion al final de product category
-food<-as.data.frame(lapply(food, function(y) gsub("[[:punct:]]+$", "", y)))
-
-#No hay tildes que molesten
 
 
 # Tipo de datos (furniture) -----------------------------------------------
@@ -54,10 +42,11 @@ nlevels(furniture$product_category_3_name) #210 items
 # Tipo de datos (food)-----------------------------------------------------------
 
 food$store<-as.factor(food$store)
-#food$transaction_timestamp<-as.Date(food$transaction_timestamp)
 food$till_id<-as.factor(food$till_id)
-food$sales<- as.numeric(food$sales)
+
 food$qty<-as.numeric(food$qty)
+food$sales<- as.numeric(food$sales)
+
 food$product_category_1_name<-as.factor(food$product_category_1_name)
 food$product_category_2_name<-as.factor(food$product_category_2_name)
 food$product_category_3_name<-as.factor(food$product_category_3_name)
@@ -83,8 +72,7 @@ for(i in 1:4){
   food[,i]<-ifelse(x=="",0,x)
 }
 
-#Furniture
-
+#Furniture - tiene todas las instancias con codigo hash
 for(i in 1:4){
   x<-as.vector(unlist(furniture[,i]))
   furniture[,i]<-ifelse(x=="",0,x)
@@ -92,7 +80,8 @@ for(i in 1:4){
 
 # Graficos descriptivos ---------------------------------------------------
 
-  #Histogramas de variables numericas
+
+# Histogramas de variables numericas --------------------------------------
 grafico_hist<- function(col_name, t, x, c1, c2){
 ggplot(food, aes(x=col_name)) + geom_histogram(boundary= 0, fill= c1, color = c2, alpha=0.5) +
     scale_x_continuous(limits=c(0,20), breaks=seq(0,20,2))+
@@ -103,7 +92,13 @@ ventas<- grafico_hist(food$sales, "Ventas Comida", "Ventas", "darkorchid1", "dar
 cantidad<- grafico_hist(food$qty, "Cantidad Vendida Comida", "Cantidad", "gold", "gold3")
 grid.arrange(ventas, cantidad, ncol= 2)
 
-  #Lineas evolucion cantidad vendida durante el mes en ambas tiendas
+  #pasamos a plotly
+ventasly<- ggplotly(ventas)
+cantidadly<- ggplotly(cantidad)
+subplot(ventasly,cantidadly, nrows = 1) #titulos
+
+
+# Lineas evolucion cantidad vendida durante el mes en ambas tiendas -------
   #preparar datos
 food_qty<- food %>%
  mutate(trans_day= day(transaction_timestamp))
@@ -114,8 +109,8 @@ norte<- food_qty %>%
 sur<- food_qty %>%
   filter(store== "Sur")
 
-  #construimos gráfico
-ggplot(food_qty, aes(x= trans_day, y =qty, group = 1)) +
+  #construimos grafico
+lineas<-ggplot(food_qty, aes(x= trans_day, y =qty, group = 1)) +
   stat_summary(data = norte, fun = mean,size=1, geom = "line", aes(color = "Norte")) +
   stat_summary(data = sur, fun = mean,size=1, geom = "line", aes(color = "Sur")) +
   stat_summary(data = food_qty, fun = mean,size=1, geom = "line", aes(color = "Media")) +
@@ -123,44 +118,48 @@ ggplot(food_qty, aes(x= trans_day, y =qty, group = 1)) +
   scale_color_manual(values = c("darkmagenta", "blue", "yellow")) +
   labs(title = "Cantidad media vendida en comida durante junio", x= "Dia del mes", 
        y= "Cantidad Media", color = "Tienda")+ theme_calc()
+lineas
 
+  #pasamos a plotly
+lineasly<- ggplotly(lineas)
+lineasly
 
-# Matriz de correlaci?n ---------------------------------------------------
-#FURNITURE
-#Se crea un data-frame con las columnas num?ricas
+# Matriz de correlacion ---------------------------------------------------
+  #FURNITURE
+#Se crea un data-frame con las columnas numericas
 col_numerica<-unlist(lapply(furniture,is.numeric))
 df_numerica<-furniture[,unlist(lapply(furniture,is.numeric))]
-#Se procede a dibujar la gr?fica 
+
+#Se procede a dibujar la grafica 
 corrplot(cor(df_numerica), type="upper", method="color", tl.cex=0.9)
 
-#Se muestra claramente que entre "qty" y "sales" existe una relaci?n directa 
-cor(furniture$qty, furniture$sales) #Un valor de +0.48 implica una relaci?n lineal ascendente 
+#Se muestra claramente que entre "qty" y "sales" existe una relacion directa 
+cor(furniture$qty, furniture$sales) #Un valor de +0.48 implica una relacion lineal ascendente 
 #a cada magnitud de aumento de una de las variables corresponde a aumentar  el valor de la otra por 0.48.
-#Se dibuja esa relaci?n:
+#Se dibuja esa relacion:
 plot(x= furniture$qty, y=furniture$sales , main= "Relacion entre cantidad y ventas en muebles" , xlab="cantidad", ylab="ventas")
 
 
-#FOOD
-#Se crea un data-frame con las columnas num?ricas
+  #FOOD
+#Se crea un data-frame con las columnas numericas
 col_numerica2<-unlist(lapply(food,is.numeric))
 df_numerica2<-food[,unlist(lapply(food,is.numeric))]
-#Se procede a dibujar la gr?fica 
-corrplot(cor(df_numerica2), type="upper", method="circle", tl.cex=0.9)
+#Se procede a dibujar la grafica 
+corrplot(cor(df_numerica2), type="upper", method="circle", tl.cex=0.8)
 
-#Se muestra claramente que entre "qty" y "sales" existe una relaci?n directa 
-cor(food$qty, food$sales) #Un valor de +0.77 implica una relaci?n lineal ascendente 
+#Se muestra claramente que entre "qty" y "sales" existe una relacion directa 
+cor(food$qty, food$sales) #Un valor de +0.77 implica una relacion lineal ascendente 
 #a cada magnitud de aumento de una de las variables corresponde a aumentar  el valor de la otra por 0.77.
-#Se dibuja esa relaci?n
+#Se dibuja esa relacion
 plot(x= food$qty, y=food$sales , main= "Relacion entre cantidad y ventas en comida " , xlab="cantidad", ylab="ventas")
 
 #Se puede ver un claro OUTLIER '!?!?!?!
 
 
 # Tarta por categoria del archivo food ------------------------------------
+  #Preparando datos:
 
-#Preparando datos:
-
-# conteo de variables no numericas ----------------------------------------
+#Conteo de variables no numericas
 dfconteo_c1<-food%>%
   dplyr::count(product_category_1_name)
 dfconteo_c2<-food%>%
@@ -172,14 +171,16 @@ dfconteo_store<-food%>%
 
 
 t<-function(df,t, n){ 
-ggplot(df,aes(x="",y=porcentajes, fill=Nombre))+
-  geom_bar(stat = "identity", color="white")+
-    geom_text(aes(label= round(porcentajes,2) ), position=position_stack(vjust=0.5),color="black",size=4)+
-    coord_polar(theta = "y") + theme_pander() +
-    labs(title=t , fill= n) 
-
+  ggplot(df,aes(x="",y=porcentajes, fill=Nombre))+
+    geom_bar(stat = "identity", color="white")+
+    geom_text(aes(label= round(porcentajes,2)*100), position=position_stack(vjust=0.5),color="black",size=4)+
+    coord_polar(theta = "y") + theme_void() + 
+    labs(title=t , fill= n) +  theme(legend.text=element_text(size=10))
+  
 }
 
+
+  #aplicamos la funcion
 names(dfconteo_c1) <- c("Nombre","porcentajes")
 dfconteo_c1$porcentajes <- dfconteo_c1$porcentajes/sum(dfconteo_c1$porcentajes)
 
@@ -190,10 +191,14 @@ names(dfconteo_c3) <- c("Nombre","porcentajes")
 dfconteo_c3$porcentajes <- dfconteo_c3$porcentajes/sum(dfconteo_c3$porcentajes)
 
 
-t(dfconteo_c1, "Niveles de la segunda categoria de food", "Niveles")
-t(dfconteo_c2, "Niveles de la primera categoria de food", "Niveles")
-t(dfconteo_c3, "Niveles de la tercera categoria de food", "Niveles")
+tarta1<- t(dfconteo_c1, "Niveles de la segunda categoria de food", "Niveles")
+tarta2<- t(dfconteo_c2, "Niveles de la primera categoria de food", "Niveles")
+tarta3<- t(dfconteo_c3, "Niveles de la tercera categoria de food", "Niveles")
 
+
+  #unificamos los dos primeros apartando el tercero debido a su tamano
+grid.arrange(tarta1, tarta2, ncol=2)
+tarta3
 
 
 # Nube de palabras furniture ----------------------------------------------
@@ -206,22 +211,25 @@ colnames(recuento)
 dim(recuento)  #[1] 270   2
 head(arrange(recuento, desc(Freq)))
 
-#Se decide eliminar palabras "vacias" de significado
 
-corpus <- read_excel("./DatosTransformados/corpus.xlsx")
+#Se decide eliminar palabras "vacias" de significado
+corpus <- read_excel("DatosTransformados/corpus.xlsx")
 colnames(recuento)
 recuento$Var1<- as.character(recuento$Var1)
 colnames(corpus)<-"Var1"
 corpus$Var1<- as.character(corpus$Var1)
 recuento2<- anti_join(recuento, corpus, by="Var1")
 
-head(arrange(recuento2, desc(Freq))) #Las palabras m?s frecuentes
-arrange(recuento2, desc(Freq))  #todas las palabras ordenadas seg?n su frecuencia en orden descendiente
+head(arrange(recuento2, desc(Freq))) #Las palabras mas frecuentes
+arrange(recuento2, desc(Freq))  #todas las palabras ordenadas segun su frecuencia en orden descendiente
 
 #Creamos el "wordcloud"
+nube<-wordcloud2(recuento2,rotateRatio=0.1,minSize =15 ,shape = "pentagon",color= 'random-light' ,backgroundColor = "black",size=1.1)
+nube
 
-wordcloud2(recuento2,rotateRatio=0.1,minSize =15 ,shape = "pentagon",color= 'random-light' ,backgroundColor = "black",size=1.1)
-
+#descargamos el wordcloud
+saveWidget(nube,"tmp.html",selfcontained = F)
+webshot("tmp.html","fig_1.png", delay =5, vwidth = 480, vheight=480)
 
 # Boxplot de cada semana Ventas y Cantidad (Food)-----------------------------------------------------------------
 
@@ -276,14 +284,25 @@ grid.arrange(bp_ventas_zoom, bp_cantidad_zoom, ncol= 2)
 #unificamos los cuatro boxplot para observar comparativa
 grid.arrange(bp_ventas, bp_cantidad, bp_ventas_zoom, bp_cantidad_zoom, ncol=2, nrow=2)
 
+  #pasamos a plotly
+bp_ventasly<- ggplotly(bp_ventas)
+bp_cantidadly<- ggplotly(bp_cantidad)
+bp_ventas_zoom<- ggplotly(bp_ventas_zoom)
+bp_cantidad_zoom<- ggplotly(bp_cantidad_zoom)
+subplot(bp_ventasly,bp_cantidadly, bp_ventas_zoom, bp_cantidad_zoom, nrows = 2) #titulos
 
-  #Barras apiladas Norte/Sur Comida Vendida
+
+
+# Barras apiladas Norte/Sur Comida Vendida --------------------------------
+
 ggplot(data=food, aes(x=till_id, y=sales, fill=store)) + 
   geom_bar(stat="identity") + labs(title = "Ventas en tiendas Norte y Sur", x= "Tipo de Caja", y= "Ventas en Comida",
                                    fill= "Tienda Ikea") +
-  scale_fill_manual(values=c("blue", "yellow")) + theme_gdocs()
+  scale_fill_manual(values=c("blue", "gold2")) + theme_gdocs()
 
-  #Histograma members socios y NO socios
+
+# Histograma members socios y NO socios -----------------------------------
+
 food_socios<- food[food$membership_id !=0,]
 food_no_socios<- food[food$membership_id ==0,]
 
@@ -298,8 +317,13 @@ hist_s<- grafico_socios(food_socios, food_socios$sales, "Ventas a Socios", "Vent
 
 grid.arrange(hist_nos, hist_s, ncol= 2)
 
+  #pasamos a plotly
+hist_nosly<- ggplotly(hist_nos)
+hist_sly<- ggplotly(hist_s)
+subplot(hist_nosly,hist_sly, nrows = 1) #titulos
 
-# Grafico de lineas con semanas y dos lineas que sean Norte/sur de ventas furniture ----------------------------------------------------------------------
+
+#Grafico de lineas por semana Norte/sur de ventas furniture ----------------------------------------------------------------------
 
 #Preparar datos
 #semana 1
@@ -329,92 +353,22 @@ w4.4$week<-as.factor(w4.4$week)
 #unificar cuatro df
 furniture_week<- rbind(w1.1,w2.2,w3.3,w4.4)
 
-
-#
-
+#discernir norte/sur
 norte_f<- furniture_week %>%
   filter(store== "Norte")
 
 sur_f<- furniture_week %>%
   filter(store== "Sur")
 
-#generar gr?fico 
-
-ggplot(furniture_week, aes(x=as.factor(week), y= sales, group= 1)) + 
-  stat_summary(data=  norte_f,  fun= sum ,size=1.5, geom ="line", aes(color= "Norte"))+
-  stat_summary(data= sur_f , fun=sum ,size=1.5, geom= "line",aes(color= "Sur"))+ 
+#generar grafico 
+lineas2<- ggplot(furniture_week, aes(x=as.factor(week), y= sales, group= 1)) + 
+  stat_summary(data=  norte_f,  fun= sum ,size=1, geom ="line", aes(color= "Norte"))+
+  stat_summary(data= sur_f , fun=sum ,size=1, geom= "line",aes(color= "Sur"))+ 
   labs(title="Ventas por semana en muebles" , x= "Semana", y="Cantidad vendida ", color= "Tienda")+
-  scale_color_manual(values = c( "darkorchid1", "darkorchid4" ))+
+  scale_color_manual(values = c( "blue", "gold2" ))+
   theme_classic()+
   theme(panel.grid.major = element_line(color="grey", linetype="dotted"))
 
-
-
-
-
-
-# Intento shiny 1 ---------------------------------------------------------
-library(dplyr)
-library(ggplot2)
-library(plotly)
-library(shiny)
-library(DT)
-library(shinyWidgets)
-library(shinythemes)
-library(leaflet)
-
-df<-furniture
-
-df<-furniture[1:1000,] #para hacer mas pequeño el dataset a ver si asi carga pero no :(
-df$transaction_day <- substr(df$transaction_timestamp, 1, 10)
-df$transaction_hour <- substr(df$transaction_timestamp, 12,16)
-
-df$transaction_day<-as.Date(df$transaction_day)
-str(df)
-
-#eliminar columna timestamp
-df<-select(df, - transaction_timestamp)
-str(df)
-
-ui <- fluidPage(
-  titlePanel("Top 10 categorías vendidas"),
-  sidebarLayout(
-    sidebarPanel(
-      dateRangeInput(inputId = 'date_range', label = 'Selecciona el periodo temporal', min=min(df$transaction_day), max=max(df$transaction_day), start="2019-06-01", end="2019-06-29"), 
-      pickerInput("tienda_select", label= "Selecciona la tienda Ikea: ", choices = as.character(unique(df$store)), selected = "Norte")
-      
-    ),
-    mainPanel(
-      tabsetPanel(
-        tabPanel('Categoria', plotlyOutput('barra'))
-      )
-    )
-  )
-)
-
-
-server<-function(input, output){
-  tabla<-reactive({
-    tabla<-filter(df, 
-                  transaction_day >= input$date_range[1] & 
-                  transaction_day <= input$date_range[2] )%>%
-                  group_by(product_category_1_name)%>%
-                  summarise(cantidad=sum(qty))
-  })
-  
-
-    output$barra <- renderPlot({
-      ggplot(top_n(tabla(),10), aes(product_category_1_name, cantidad))+
-        theme_bw()+
-        theme(axis.text.x = element_text(face= 'bold', size=12),
-              axis.text.y = element_text(face= 'bold', size=12),
-              axis.title.x = element_blank())
-
-
-})
-}
-
-
-shinyApp(ui = ui, server = server)
-
-
+  #pasamos a plotly
+lineas2ly<- ggplotly(lineas2)
+lineas2ly

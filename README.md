@@ -1,3 +1,3 @@
 # RETO4
-#Estas son versiones intermedias referidas al primer Sprint que finalizó el 7 de mayo. 
-#Equipo verde claro
+#Este es el proyecto de Reto 4 del equipo verde claro formado por Alba Vilches, Gabriela Ybarra, Nahia Uncetabarrenechea, Lorea Erekatxo, Paule Aguirre y Nerea Barrueta
+
